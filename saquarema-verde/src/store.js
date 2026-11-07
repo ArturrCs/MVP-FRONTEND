@@ -23,6 +23,9 @@ const seed = {
     { id: 1, name: "Alta temporada (verão)", from: "2026-12-15", to: "2027-03-15", hours: "07h–17h" },
     { id: 2, name: "Baixa temporada", from: "2027-03-16", to: "2027-12-14", hours: "08h–16h" },
   ],
+  v: 2,
+  alert: { active: true, text: "Trilha do Mirante com trecho em manutenção: use o acesso alternativo." },
+  reports: [],
   news: [
     { id: 1, title: "Trilha do Mirante com trecho em manutenção", text: "Equipe do parque faz reparos na escadaria. Use o acesso alternativo." },
     { id: 2, title: "Novas regras de visitação", text: "Grupos acima de 10 pessoas precisam agendar com antecedência." },
@@ -33,11 +36,11 @@ const load = () => {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (!s) return seed;
-    // Migração: completa dados antigos com imagem/local e adiciona atrações novas
+    if (s.v >= 2) return { ...seed, ...s };
     const base = Object.fromEntries(seed.attractions.map((a) => [a.id, a]));
     const have = new Set(s.attractions.map((a) => a.id));
     const old = s.attractions.map((a) => ({ ...base[a.id], ...a }));
-    return { ...seed, ...s, attractions: [...old, ...seed.attractions.filter((a) => !have.has(a.id))] };
+    return { ...seed, ...s, v: 2, attractions: [...old, ...seed.attractions.filter((a) => !have.has(a.id))] };
   } catch { return seed; }
 };
 let data = load();
@@ -45,8 +48,10 @@ const subs = new Set();
 
 export const update = (fn) => {
   data = fn(data);
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch {}
-  subs.forEach((s) => s());
+  let ok = true;
+  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch { ok = false; }
+  subs.forEach((x) => x());
+  return ok;
 };
 export const useData = () =>
   useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => data);
@@ -59,3 +64,13 @@ export const login = (e, p) => {
 };
 export const isAdmin = () => sessionStorage.getItem("sv_admin") === "1";
 export const logout = () => sessionStorage.removeItem("sv_admin");
+
+// Roteiro favorito (por visitante, neste navegador)
+let favs = (() => { try { return JSON.parse(localStorage.getItem("sv_favs")) || []; } catch { return []; } })();
+const fsubs = new Set();
+export const toggleFav = (id) => {
+  favs = favs.includes(id) ? favs.filter((x) => x !== id) : [...favs, id];
+  try { localStorage.setItem("sv_favs", JSON.stringify(favs)); } catch {}
+  fsubs.forEach((x) => x());
+};
+export const useFavs = () => useSyncExternalStore((f) => { fsubs.add(f); return () => fsubs.delete(f); }, () => favs);

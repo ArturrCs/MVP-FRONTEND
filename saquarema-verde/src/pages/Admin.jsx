@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useData, update, uid } from "../store";
+import { defImg, readImg } from "../ui";
 
 // Botão flutuante central: aparece só quando há alteração não salva
 function SaveBar({ show, onSave, onCancel }) {
@@ -13,7 +14,7 @@ function SaveBar({ show, onSave, onCancel }) {
   );
 }
 
-function Crud({ title, k, list, fields }) {
+function Crud({ title, k, list, fields, defaults = {}, noList }) {
   const empty = Object.fromEntries(fields.map((x) => [x.k, x.opts ? x.opts[0] : ""]));
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
@@ -29,7 +30,7 @@ function Crud({ title, k, list, fields }) {
       update((d) => ({ ...d, [k]: d[k].map((i) => (i.id === editId ? { ...i, ...f } : i)) }));
       setMsg("Alteração salva!");
     } else {
-      update((d) => ({ ...d, [k]: [...d[k], { id: uid(), ...f }] }));
+      update((d) => ({ ...d, [k]: [...d[k], { id: uid(), ...defaults, ...f }] }));
       setMsg("Item adicionado!");
     }
     reset();
@@ -58,35 +59,106 @@ function Crud({ title, k, list, fields }) {
         </div>
       </form>
       {msg && <p role="status" className="okmsg">{msg}</p>}
-      <ul className="list">
-        {list.map((i) => (
-          <li key={i.id}>
-            <span>{fields.map((x) => i[x.k]).join(" · ")}</span>
-            <span className="actions">
-              <button className="link ed" onClick={() => edit(i)}>Editar</button>
-              <button className="link" onClick={() => del(i.id)}>Remover</button>
-            </span>
-          </li>
-        ))}
-      </ul>
+      {!noList && (
+        <ul className="list">
+          {list.map((i) => (
+            <li key={i.id}>
+              <span>{fields.map((x) => i[x.k]).join(" · ")}</span>
+              <span className="actions">
+                <button className="link ed" onClick={() => edit(i)}>Editar</button>
+                <button className="link" onClick={() => del(i.id)}>Remover</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       <SaveBar show={dirty} onSave={() => submit()} onCancel={reset} />
     </section>
   );
 }
 
-const TEXT = [["hours", "Horário"], ["condition", "Condição"], ["image", "Imagem (/img/arquivo.jpg ou URL)"], ["location", "Local no mapa (endereço ou lat,lng)"]];
+function AlertBox({ alert }) {
+  const [al, setAl] = useState(alert);
+  const [m, setM] = useState("");
+  const dirty = al.text !== alert.text || al.active !== alert.active;
+  const save = () => { update((d) => ({ ...d, alert: al })); setM("Aviso salvo!"); };
+  return (
+    <section className="card">
+      <h2>Faixa de aviso no topo do site</h2>
+      <label>Texto do aviso<input value={al.text} onChange={(e) => setAl({ ...al, text: e.target.value })} /></label>
+      <label className="chk"><input type="checkbox" checked={al.active} onChange={(e) => setAl({ ...al, active: e.target.checked })} /> Exibir no topo do site</label>
+      {m && !dirty && <p role="status" className="okmsg">{m}</p>}
+      <SaveBar show={dirty} onSave={save} onCancel={() => setAl(alert)} />
+    </section>
+  );
+}
+
+function Reports({ reports }) {
+  const set = (id, p) => update((d) => ({ ...d, reports: d.reports.map((r) => (r.id === id ? { ...r, ...p } : r)) }));
+  const del = (id) => update((d) => ({ ...d, reports: d.reports.filter((r) => r.id !== id) }));
+  return (
+    <section className="card">
+      <h2>Relatos de visitantes</h2>
+      {!reports.length && <p>Nenhum relato recebido.</p>}
+      <ul className="list">
+        {reports.map((r) => (
+          <li key={r.id}>
+            <span><strong>{r.type}</strong> · {r.place} · {r.date} · {r.status}<br />{r.text}{r.contact && <><br />Contato: {r.contact}</>}</span>
+            <span className="actions">
+              {r.status === "Novo" && <button className="link ed" onClick={() => set(r.id, { status: "Resolvido" })}>Marcar resolvido</button>}
+              <button className="link" onClick={() => del(r.id)}>Excluir</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+const TEXT = [["hours", "Horário"], ["condition", "Condição"], ["image", "Capa (/img/arquivo.jpg ou URL)"], ["location", "Local no mapa (endereço ou lat,lng)"]];
 
 export default function Admin() {
-  const { attractions, events, seasons, news } = useData();
-  const [draft, setDraft] = useState(attractions);
-  const [saved, setSaved] = useState(false);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(attractions);
-  const change = (id, p) => { setDraft((l) => l.map((a) => (a.id === id ? { ...a, ...p } : a))); setSaved(false); };
-  const save = () => { update((d) => ({ ...d, attractions: draft })); setSaved(true); };
+  const { attractions, events, seasons, news, alert, reports = [] } = useData();
+  const [ed, setEd] = useState({});
+  const [msg, setMsg] = useState("");
+  const draft = attractions.map((a) => ({ ...a, ...ed[a.id] }));
+  const dirty = Object.keys(ed).length > 0;
+  const change = (id, p) => { setEd((e) => ({ ...e, [id]: { ...e[id], ...p } })); setMsg(""); };
+  const save = () => {
+    const ok = update((d) => ({ ...d, attractions: d.attractions.map((a) => ({ ...a, ...ed[a.id] })) }));
+    setEd({});
+    setMsg(ok ? "Alterações salvas!" : "Não foi possível salvar: armazenamento do navegador cheio. Use fotos menores ou remova algumas.");
+  };
+  const up = async (e, a, cover) => {
+    const t = e.target, f = t.files[0];
+    if (!f) return;
+    try {
+      const u = await readImg(f);
+      change(a.id, cover ? { image: u } : { gallery: [...(a.gallery || []), u] });
+    } catch { setMsg("Não foi possível ler a imagem."); }
+    t.value = "";
+  };
+  const del = (a) => {
+    if (!window.confirm(`Excluir "${a.name}"?`)) return;
+    update((d) => ({ ...d, attractions: d.attractions.filter((x) => x.id !== a.id) }));
+    setEd((e) => { const n = { ...e }; delete n[a.id]; return n; });
+  };
+
+  const today = new Date().toLocaleDateString("sv-SE");
+  const stats = [
+    ["Atrações abertas", `${attractions.filter((a) => a.status === "Aberta").length}/${attractions.length}`],
+    ["Eventos futuros", events.filter((e) => e.date >= today).length],
+    ["Relatos novos", reports.filter((r) => r.status === "Novo").length],
+    ["Aviso no ar", alert?.active && alert.text ? "Sim" : "Não"],
+  ];
 
   return (
     <>
       <h1>Painel do administrador</h1>
+      <div className="stats">{stats.map(([k, v]) => <div key={k}><strong>{v}</strong><span>{k}</span></div>)}</div>
+
+      <AlertBox alert={alert || { active: false, text: "" }} />
+
       <section className="card">
         <h2>Atrações</h2>
         {draft.map((a) => (
@@ -95,14 +167,50 @@ export default function Admin() {
             <select aria-label="Status" value={a.status} onChange={(e) => change(a.id, { status: e.target.value })}>
               {["Aberta", "Atenção", "Fechada"].map((o) => <option key={o}>{o}</option>)}
             </select>
+            <select aria-label="Dificuldade" value={a.difficulty} onChange={(e) => change(a.id, { difficulty: e.target.value })}>
+              {["Fácil", "Moderada", "Difícil", "Variada"].map((o) => <option key={o}>{o}</option>)}
+            </select>
             {TEXT.map(([k, l]) => (
-              <input key={k} aria-label={l} placeholder={l} value={a[k] || ""} onChange={(e) => change(a.id, { [k]: e.target.value })} />
+              <input key={k} aria-label={l} placeholder={l}
+                value={k === "image" && (a.image || "").startsWith("data:") ? "(foto enviada)" : a[k] || ""}
+                onChange={(e) => change(a.id, { [k]: e.target.value })} />
             ))}
+            <label className="file">Enviar nova capa<input type="file" accept="image/*" onChange={(e) => up(e, a, true)} /></label>
+            <label className="file">Adicionar foto à galeria<input type="file" accept="image/*" onChange={(e) => up(e, a, false)} /></label>
+            <div className="full photos">
+              {[a.image, ...(a.gallery || [])].map((src, i) =>
+                (i > 0 || !/\.svg$/.test(src || "")) && (
+                  <figure className="gthumb" key={i}>
+                    <img src={src} alt={i === 0 ? "Capa" : `Foto ${i} da galeria`} />
+                    <figcaption>{i === 0 ? "Capa" : `Galeria ${i}`}</figcaption>
+                    <button type="button" className="del"
+                      onClick={() => change(a.id, i === 0 ? { image: defImg(a) } : { gallery: a.gallery.filter((_, j) => j !== i - 1) })}>
+                      🗑 Excluir
+                    </button>
+                  </figure>
+                )
+              )}
+            </div>
+            <div className="full actions">
+              <button type="button" className="del" onClick={() => del(a)}>🗑 Excluir atração</button>
+            </div>
           </div>
         ))}
-        {saved && !dirty && <p role="status" className="okmsg">Alterações salvas!</p>}
-        <SaveBar show={dirty} onSave={save} onCancel={() => setDraft(attractions)} />
+        {msg && <p role="status" className="okmsg">{msg}</p>}
+        <SaveBar show={dirty} onSave={save} onCancel={() => setEd({})} />
       </section>
+
+      <Crud title="Nova atração" k="attractions" list={[]} noList
+        defaults={{ status: "Aberta", condition: "A informar", image: "/img/parque.svg", gallery: [] }}
+        fields={[
+          { k: "name", l: "Nome" }, { k: "area", l: "Área", opts: ["PECS", "REE Jacarepiá"] },
+          { k: "type", l: "Tipo", opts: ["Trilha", "Cachoeira", "Biodiversidade", "Parque"] },
+          { k: "difficulty", l: "Dificuldade", opts: ["Fácil", "Moderada", "Difícil", "Variada"] },
+          { k: "distance", l: "Distância" }, { k: "hours", l: "Horário" }, { k: "location", l: "Local no mapa" },
+          { k: "desc", l: "Descrição" }, { k: "tips", l: "Dicas de segurança" }, { k: "rules", l: "Regras" },
+        ]} />
+
+      <Reports reports={reports} />
 
       <Crud title="Eventos" k="events" list={events} fields={[
         { k: "title", l: "Título" }, { k: "date", l: "Data", t: "date" }, { k: "time", l: "Horário" },
