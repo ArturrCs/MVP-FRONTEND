@@ -6,27 +6,27 @@ import Eventos from "./pages/Eventos";
 import Perfil from "./pages/Perfil";
 import Relatar from "./pages/Relatar";
 import Roteiro from "./pages/Roteiro";
-import { isAdmin, logout, useData, useFavs, useEvs } from "./store";
+import { demoMode, logout, useAuth, useData, useFavs, useEvs } from "./store";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const Login = lazy(() => import("./pages/Login"));
 const SEL = ".panel, article.card, .acard, .list li, main>h1, main>h2, article>h2, .facts div, .stats div, .gitem";
 
 export default function App() {
-  const [auth, setAuth] = useState(isAdmin());
+  const { ready, admin: auth } = useAuth();
   const [fs, setFs] = useState(() => Number(localStorage.getItem("sv_fs")) || 100);
   const [hc, setHc] = useState(() => localStorage.getItem("sv_hc") === "1");
   const [open, setOpen] = useState(false);
   const [ai, setAi] = useState(0);
   const [pause, setPause] = useState(false);
-  const { alerts = [], reports = [] } = useData();
+  const { alerts = [], reports = [], loading, error } = useData();
   const roteiro = useFavs().length + useEvs().length;
   const novos = reports.filter((r) => r.status === "Novo").length;
   const act = alerts.filter((x) => x.active && x.text);
   const cur = act.length ? act[ai % act.length] : null;
   const nav = useNavigate();
   const home = useLocation().pathname === "/";
-  const out = () => { logout(); setAuth(false); nav("/"); };
+  const out = async () => { await logout(); nav("/"); };
 
   useEffect(() => {
     document.documentElement.style.fontSize = fs + "%";
@@ -134,6 +134,9 @@ export default function App() {
         )}
       <div className="shell">
         <main id="main" tabIndex={-1}>
+          {demoMode && <p className="demo-note" role="note">Modo demonstração: dados de exemplo, sem salvar alterações.</p>}
+          {error && <p role="alert" className="err">{error} <button className="btn sm" onClick={() => location.reload()}>Tentar de novo</button></p>}
+          {loading && <p role="status">Carregando dados…</p>}
           <Suspense fallback={<p>Carregando…</p>}>
             <Routes>
               <Route path="/" element={<Home />} />
@@ -142,8 +145,8 @@ export default function App() {
               <Route path="/eventos" element={<Eventos />} />
               <Route path="/roteiro" element={<Roteiro />} />
               <Route path="/relatar" element={<Relatar />} />
-              <Route path="/login" element={<Login onLogin={() => setAuth(true)} />} />
-              <Route path="/admin" element={auth ? <Admin /> : <Navigate to="/login" />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/admin" element={!ready ? <p>Carregando…</p> : auth ? <Admin /> : <Navigate to="/login" />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Routes>
           </Suspense>

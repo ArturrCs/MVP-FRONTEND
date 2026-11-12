@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useData, update, uid } from "../store";
-import { defImg, readImg } from "../ui";
+import { useData, add, patch, remove, uploadImage } from "../store";
+import { defImg } from "../ui";
 
 // Botão flutuante central: aparece só quando há alteração não salva
 function SaveBar({ show, onSave, onCancel }) {
@@ -23,20 +23,24 @@ function Crud({ id, title, k, list, fields, defaults = {}, noList }) {
   const dirty = !!orig && fields.some((x) => (orig[x.k] ?? "") !== f[x.k]);
   const reset = () => { setF(empty); setEditId(null); };
 
-  const submit = (e) => {
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
     e?.preventDefault();
+    if (busy) return;
     if (fields.some((x) => !x.opt && !String(f[x.k]).trim())) return setMsg("Preencha todos os campos.");
-    if (editId) {
-      update((d) => ({ ...d, [k]: d[k].map((i) => (i.id === editId ? { ...i, ...f } : i)) }));
-      setMsg("Alteração salva!");
-    } else {
-      update((d) => ({ ...d, [k]: [...d[k], { id: uid(), ...defaults, ...f }] }));
-      setMsg("Item adicionado!");
-    }
-    reset();
+    setBusy(true);
+    try {
+      if (editId) { await patch(k, editId, f); setMsg("Alteração salva!"); }
+      else { await add(k, { ...defaults, ...f }); setMsg("Item adicionado!"); }
+      reset();
+    } catch (x) { setMsg("Erro: " + x.message); }
+    finally { setBusy(false); }
   };
   const edit = (i) => { setEditId(i.id); setF(Object.fromEntries(fields.map((x) => [x.k, i[x.k] ?? ""]))); setMsg(""); };
-  const del = (id) => { update((d) => ({ ...d, [k]: d[k].filter((i) => i.id !== id) })); if (id === editId) reset(); };
+  const del = async (id) => {
+    if (!window.confirm("Remover este item?")) return;
+    try { await remove(k, id); if (id === editId) reset(); } catch (x) { setMsg("Erro: " + x.message); }
+  };
 
   return (
     <section className="card" id={id}>
@@ -54,7 +58,7 @@ function Crud({ id, title, k, list, fields, defaults = {}, noList }) {
           </label>
         ))}
         <div className="actions">
-          {!editId && <button className="btn">Adicionar</button>}
+          {!editId && <button className="btn" disabled={busy}>Adicionar</button>}
           {editId && <button type="button" className="btn ghost" onClick={reset}>Cancelar edição</button>}
         </div>
       </form>
@@ -79,28 +83,30 @@ function Crud({ id, title, k, list, fields, defaults = {}, noList }) {
 
 function Avisos({ alerts }) {
   const [t, setT] = useState("");
-  const set = (id, p) => update((d) => ({ ...d, alerts: d.alerts.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
-  const add = (e) => {
+  const [err, setErr] = useState("");
+  const run = async (fn) => { setErr(""); try { await fn(); } catch (x) { setErr("Erro: " + x.message); } };
+  const set = (id, p) => run(() => patch("alerts", id, p));
+  const create = (e) => {
     e.preventDefault();
     if (!t.trim()) return;
-    update((d) => ({ ...d, alerts: [...d.alerts, { id: uid(), active: true, text: t.trim() }] }));
-    setT("");
+    run(async () => { await add("alerts", { active: true, text: t.trim() }); setT(""); });
   };
   return (
     <section className="card" id="avisos">
       <h2>Avisos da página principal</h2>
       <p className="hint">Com 2 ou mais avisos ativos, eles se alternam automaticamente.</p>
-      <form onSubmit={add} className="form">
+      <form onSubmit={create} className="form">
         <label>Novo aviso<input value={t} onChange={(e) => setT(e.target.value)} /></label>
         <div className="actions"><button className="btn">Adicionar aviso</button></div>
       </form>
+      {err && <p role="alert" className="err">{err}</p>}
       <ul className="list">
         {alerts.map((x) => (
           <li key={x.id}>
             <span>{x.text}</span>
             <span className="actions">
               <label className="chk"><input type="checkbox" checked={x.active} onChange={(e) => set(x.id, { active: e.target.checked })} /> Exibir</label>
-              <button className="link" onClick={() => update((d) => ({ ...d, alerts: d.alerts.filter((y) => y.id !== x.id) }))}>Remover</button>
+              <button className="link" onClick={() => run(() => remove("alerts", x.id))}>Remover</button>
             </span>
           </li>
         ))}
@@ -110,11 +116,14 @@ function Avisos({ alerts }) {
 }
 
 function Reports({ reports }) {
-  const set = (id, p) => update((d) => ({ ...d, reports: d.reports.map((r) => (r.id === id ? { ...r, ...p } : r)) }));
-  const del = (id) => update((d) => ({ ...d, reports: d.reports.filter((r) => r.id !== id) }));
+  const [err, setErr] = useState("");
+  const run = async (fn) => { setErr(""); try { await fn(); } catch (x) { setErr("Erro: " + x.message); } };
+  const set = (id, p) => run(() => patch("reports", id, p));
+  const del = (id) => window.confirm("Excluir este relato?") && run(() => remove("reports", id));
   return (
     <section className="card" id="relatos">
       <h2>Relatos de visitantes</h2>
+      {err && <p role="alert" className="err">{err}</p>}
       {!reports.length && <p>Nenhum relato recebido.</p>}
       <ul className="list">
         {reports.map((r) => (
@@ -142,24 +151,36 @@ export default function Admin() {
   const draft = attractions.map((a) => ({ ...a, ...ed[a.id] }));
   const dirty = Object.keys(ed).length > 0;
   const change = (id, p) => { setEd((e) => ({ ...e, [id]: { ...e[id], ...p } })); setMsg(""); };
-  const save = () => {
-    const ok = update((d) => ({ ...d, attractions: d.attractions.map((a) => ({ ...a, ...ed[a.id] })) }));
-    setEd({});
-    setMsg(ok ? "Alterações salvas!" : "Não foi possível salvar: armazenamento do navegador cheio. Use fotos menores ou remova algumas.");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    const left = { ...ed };
+    let fail = "";
+    for (const [id, p] of Object.entries(ed)) {
+      try { await patch("attractions", Number(id), p); delete left[id]; }
+      catch (x) { fail = x.message; }
+    }
+    setEd(left);
+    setBusy(false);
+    setMsg(fail ? "Erro ao salvar: " + fail : "Alterações salvas!");
   };
   const up = async (e, a, cover) => {
     const t = e.target, f = t.files[0];
     if (!f) return;
+    setMsg("Enviando foto…");
     try {
-      const u = await readImg(f);
+      const u = await uploadImage(f);
       change(a.id, cover ? { image: u } : { gallery: [...(a.gallery || []), u] });
-    } catch { setMsg("Não foi possível ler a imagem."); }
+      setMsg("Foto enviada. Clique em “Salvar alteração” para publicar.");
+    } catch (x) { setMsg("Erro no envio da foto: " + x.message); }
     t.value = "";
   };
-  const del = (a) => {
+  const del = async (a) => {
     if (!window.confirm(`Excluir "${a.name}"?`)) return;
-    update((d) => ({ ...d, attractions: d.attractions.filter((x) => x.id !== a.id) }));
-    setEd((e) => { const n = { ...e }; delete n[a.id]; return n; });
+    try {
+      await remove("attractions", a.id);
+      setEd((e) => { const n = { ...e }; delete n[a.id]; return n; });
+    } catch (x) { setMsg("Erro: " + x.message); }
   };
 
   const today = new Date().toLocaleDateString("sv-SE");
@@ -199,7 +220,7 @@ export default function Admin() {
             </select>
             {TEXT.map(([k, l]) => (
               <input key={k} aria-label={l} placeholder={l}
-                value={k === "image" && (a.image || "").startsWith("data:") ? "(foto enviada)" : a[k] || ""}
+                value={a[k] || ""}
                 onChange={(e) => change(a.id, { [k]: e.target.value })} />
             ))}
             <label className="file">Enviar nova capa<input type="file" accept="image/*" onChange={(e) => up(e, a, true)} /></label>

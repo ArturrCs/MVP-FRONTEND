@@ -16,25 +16,6 @@ export const Img = (p) => (
 );
 
 // Redimensiona a foto no navegador (máx. 1200px) para caber no armazenamento
-export const readImg = (file, max = 1000) =>
-  new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onerror = rej;
-    r.onload = () => {
-      const i = new Image();
-      i.onerror = rej;
-      i.onload = () => {
-        const k = Math.min(1, max / Math.max(i.width, i.height));
-        const c = document.createElement("canvas");
-        c.width = i.width * k; c.height = i.height * k;
-        c.getContext("2d").drawImage(i, 0, 0, c.width, c.height);
-        res(c.toDataURL("image/jpeg", 0.7));
-      };
-      i.src = r.result;
-    };
-    r.readAsDataURL(file);
-  });
-
 const LV = { Fácil: 1, Moderada: 2, Difícil: 3 };
 export const Diff = ({ d }) => {
   const n = LV[d];

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { isAdmin, update, useData } from "../store";
+import { patch, useAuth, useData } from "../store";
 import { Badge, Diff, FavBtn, Img, Weather, mapUrl } from "../ui";
 
 export default function Perfil() {
@@ -11,12 +11,14 @@ export default function Perfil() {
   if (!a) return <><p>Atração não encontrada.</p><Link to="/atracoes">← Voltar</Link></>;
 
   const pics = [a.image, ...(a.gallery || [])];
-  const adm = isAdmin();
+  const adm = useAuth().admin;
   const DEF = { Trilha: "/img/trilha.svg", Cachoeira: "/img/cachoeira.svg", Biodiversidade: "/img/biodiversidade.svg", Parque: "/img/parque.svg", Mirante: "/img/trilha.svg", Praia: "/img/parque.svg" };
   const canDel = (i) => adm && (i > 0 || !/\.svg$/.test(a.image || ""));
-  const delPic = (i) => {
+  const delPic = async (i) => {
     if (!window.confirm(i === 0 ? "Excluir a foto de capa? Será usada a ilustração padrão." : "Excluir esta foto da galeria?")) return;
-    update((d) => ({ ...d, attractions: d.attractions.map((x) => x.id !== a.id ? x : i === 0 ? { ...x, image: DEF[a.type] || "/img/parque.svg" } : { ...x, gallery: (x.gallery || []).filter((_, j) => j !== i - 1) }) }));
+    try {
+      await patch("attractions", a.id, i === 0 ? { image: DEF[a.type] || "/img/parque.svg" } : { gallery: (a.gallery || []).filter((_, j) => j !== i - 1) });
+    } catch (x) { window.alert(x.message); }
   };
   const wa = `https://wa.me/?text=${encodeURIComponent(`Conheça ${a.name} no Circuito Saquarema Verde: ${window.location.href}`)}`;
   const facts = [["Tipo", a.type], ["Área", a.area], ["Dificuldade", <Diff d={a.difficulty} />], ["Distância", a.distance], ["Horário", a.hours], ["Condição", a.condition]];
