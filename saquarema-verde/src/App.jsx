@@ -6,25 +6,26 @@ import Eventos from "./pages/Eventos";
 import Perfil from "./pages/Perfil";
 import Relatar from "./pages/Relatar";
 import Roteiro from "./pages/Roteiro";
-import { isAdmin, logout, useData, useFavs } from "./store";
+import { isAdmin, logout, useData, useFavs, useEvs } from "./store";
 
 const Admin = lazy(() => import("./pages/Admin"));
 const Login = lazy(() => import("./pages/Login"));
+const SEL = ".panel, article.card, .acard, .list li, main>h1, main>h2, article>h2, .facts div, .stats div, .gitem";
 
 export default function App() {
   const [auth, setAuth] = useState(isAdmin());
   const [fs, setFs] = useState(() => Number(localStorage.getItem("sv_fs")) || 100);
   const [hc, setHc] = useState(() => localStorage.getItem("sv_hc") === "1");
-  const { alert: aviso } = useData();
-  const favs = useFavs();
+  const [open, setOpen] = useState(false);
+  const [ai, setAi] = useState(0);
+  const [pause, setPause] = useState(false);
+  const { alerts = [], reports = [] } = useData();
+  const roteiro = useFavs().length + useEvs().length;
+  const novos = reports.filter((r) => r.status === "Novo").length;
+  const act = alerts.filter((x) => x.active && x.text);
+  const cur = act.length ? act[ai % act.length] : null;
   const nav = useNavigate();
   const home = useLocation().pathname === "/";
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const esc = (e) => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, []);
   const out = () => { logout(); setAuth(false); nav("/"); };
 
   useEffect(() => {
@@ -33,10 +34,36 @@ export default function App() {
     try { localStorage.setItem("sv_fs", fs); localStorage.setItem("sv_hc", hc ? "1" : "0"); } catch {}
   }, [fs, hc]);
 
-  // Efeito ao rolar: elementos surgem ao entrar na tela (de baixo ao descer, de cima ao subir)
+  useEffect(() => {
+    const esc = (e) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, []);
+
+  // Avisos alternando a cada 5 s (pausa ao passar o mouse ou focar)
+  useEffect(() => {
+    if (act.length < 2 || pause) return;
+    const t = setInterval(() => setAi((i) => i + 1), 5000);
+    return () => clearInterval(t);
+  }, [act.length, pause]);
+
+  // Celular: o topo some ao rolar para baixo e volta ao rolar para cima
+  useEffect(() => {
+    const root = document.documentElement;
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (Math.abs(y - last) < 6) return;
+      root.dataset.top = y > last && y > 80 ? "hide" : "";
+      last = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); delete root.dataset.top; };
+  }, []);
+
+  // Efeito ao rolar
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const SEL = "article.card, .acard, .list li, main>h1, main>h2, article>h2, .facts div, .stats div, .gitem";
     let last = window.scrollY, dir = "down";
     const onScroll = () => { const y = window.scrollY; if (y !== last) { dir = y > last ? "down" : "up"; last = y; } };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -56,8 +83,7 @@ export default function App() {
   return (
     <>
       <a className="skip" href="#main">Pular para o conteúdo</a>
-      <div className="shell">
-      <header className={"top" + (home ? " top-home" : "")}>
+      <header className="top">
         <div className="bar">
           <NavLink to="/" className="logo" aria-label="Saquarema Verde, página inicial">
             <svg viewBox="0 0 40 36" aria-hidden="true"><path d="M0 36L14 6l8 14 6-8 12 24z" /></svg>
@@ -66,11 +92,13 @@ export default function App() {
           <nav aria-label="Principal">
             <NavLink to="/atracoes">Atrações</NavLink>
             <NavLink to="/eventos">Eventos</NavLink>
-            <NavLink to="/roteiro">Meu roteiro ({favs.length})</NavLink>
+            <NavLink to="/roteiro">Meu roteiro ({roteiro})</NavLink>
             <NavLink to="/relatar">Relatar problema</NavLink>
             {auth ? (
               <>
-                <NavLink to="/admin">Painel</NavLink>
+                <NavLink to="/admin" aria-label={novos ? `Painel, ${novos} relatos novos` : "Painel"}>
+                  Painel{novos > 0 && <span className="notif">{novos}</span>}
+                </NavLink>
                 <button className="btn sm" onClick={out}>Sair</button>
               </>
             ) : (
@@ -78,51 +106,63 @@ export default function App() {
             )}
           </nav>
         </div>
-        {home && (
-          <div className="hero-in">
-            <div className="hero-text">
-              <svg className="birds" viewBox="0 0 120 50" aria-hidden="true"><path d="M5 30Q25 5 50 28 30 18 5 30z" /><path d="M70 25Q85 8 105 22 88 16 70 25z" /></svg>
-              <h1>Descubra o Circuito Saquarema Verde</h1>
-              <p>Trilhas, cachoeiras, biodiversidade e eventos no Parque Estadual da Costa do Sol e na Reserva Ecológica Estadual de Jacarepiá.</p>
-              <Link to="/atracoes" className="btn">Explorar atrações →</Link>
-            </div>
-            <aside className="aviso" aria-label="Aviso">
-              <strong>⚠️ Aviso</strong>
-              <p>{aviso?.active && aviso.text ? aviso.text : "Nenhum aviso no momento. Boa visita!"}</p>
-            </aside>
-          </div>
-        )}
       </header>
-      <main id="main" tabIndex={-1}>
-        <Suspense fallback={<p>Carregando…</p>}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/atracoes" element={<Atracoes />} />
-            <Route path="/atracoes/:id" element={<Perfil />} />
-            <Route path="/eventos" element={<Eventos />} />
-            <Route path="/roteiro" element={<Roteiro />} />
-            <Route path="/relatar" element={<Relatar />} />
-            <Route path="/login" element={<Login onLogin={() => setAuth(true)} />} />
-            <Route path="/admin" element={auth ? <Admin /> : <Navigate to="/login" />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </Suspense>
-      </main>
-      <div className="a11y-fab">
-        {open && (
-          <div id="a11y-panel" className="a11y-panel" role="group" aria-label="Opções de acessibilidade">
-            <strong>Acessibilidade</strong>
-            <div className="actions">
-              <button onClick={() => setFs((v) => Math.max(80, v - 10))} aria-label="Diminuir fonte">A−</button>
-              <button onClick={() => setFs((v) => Math.min(150, v + 10))} aria-label="Aumentar fonte">A+</button>
+        {home && (
+          <section className="hero-full">
+            <div className="hero-in">
+              <div className="hero-text">
+                <svg className="birds" viewBox="0 0 120 50" aria-hidden="true"><path d="M5 30Q25 5 50 28 30 18 5 30z" /><path d="M70 25Q85 8 105 22 88 16 70 25z" /></svg>
+                <h1>Descubra o Circuito Saquarema Verde</h1>
+                <p>Trilhas, cachoeiras, biodiversidade e eventos no Parque Estadual da Costa do Sol e na Reserva Ecológica Estadual de Jacarepiá.</p>
+                <Link to="/atracoes" className="btn">Explorar atrações →</Link>
+              </div>
+              <aside className="aviso" aria-label="Aviso"
+                onMouseEnter={() => setPause(true)} onMouseLeave={() => setPause(false)}
+                onFocus={() => setPause(true)} onBlur={() => setPause(false)}>
+                <strong>⚠️ Aviso{act.length > 1 ? ` ${(ai % act.length) + 1}/${act.length}` : ""}</strong>
+                <p key={cur?.id} className="fade">{cur ? cur.text : "Nenhum aviso no momento. Boa visita!"}</p>
+                {act.length > 1 && (
+                  <div className="dots">
+                    {act.map((x, i) => (
+                      <button key={x.id} className={"dot" + (i === ai % act.length ? " on" : "")} aria-label={`Ver aviso ${i + 1}`} onClick={() => setAi(i)} />
+                    ))}
+                  </div>
+                )}
+              </aside>
             </div>
-            <button aria-pressed={hc} onClick={() => setHc(!hc)}>Alto contraste</button>
-            <button onClick={() => { setFs(100); setHc(false); }}>Restaurar padrão</button>
-          </div>
+          </section>
         )}
-        <button className="fab" aria-label="Acessibilidade" aria-expanded={open} aria-controls="a11y-panel" onClick={() => setOpen(!open)}>♿</button>
-      </div>
-      <footer>Circuito Saquarema Verde · Turismo sustentável e responsável<br />Foto de fundo: Kelly / Pexels</footer>
+      <div className="shell">
+        <main id="main" tabIndex={-1}>
+          <Suspense fallback={<p>Carregando…</p>}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/atracoes" element={<Atracoes />} />
+              <Route path="/atracoes/:id" element={<Perfil />} />
+              <Route path="/eventos" element={<Eventos />} />
+              <Route path="/roteiro" element={<Roteiro />} />
+              <Route path="/relatar" element={<Relatar />} />
+              <Route path="/login" element={<Login onLogin={() => setAuth(true)} />} />
+              <Route path="/admin" element={auth ? <Admin /> : <Navigate to="/login" />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </Suspense>
+        </main>
+        <div className="a11y-fab">
+          {open && (
+            <div id="a11y-panel" className="a11y-panel" role="group" aria-label="Opções de acessibilidade">
+              <strong>Acessibilidade</strong>
+              <div className="actions">
+                <button onClick={() => setFs((v) => Math.max(80, v - 10))} aria-label="Diminuir fonte">A−</button>
+                <button onClick={() => setFs((v) => Math.min(150, v + 10))} aria-label="Aumentar fonte">A+</button>
+              </div>
+              <button aria-pressed={hc} onClick={() => setHc(!hc)}>Alto contraste</button>
+              <button onClick={() => { setFs(100); setHc(false); }}>Restaurar padrão</button>
+            </div>
+          )}
+          <button className="fab" aria-label="Acessibilidade" aria-expanded={open} aria-controls="a11y-panel" onClick={() => setOpen(!open)}>♿</button>
+        </div>
+        <footer>Circuito Saquarema Verde · Turismo sustentável e responsável<br />Foto de fundo: Kelly / Pexels</footer>
       </div>
     </>
   );

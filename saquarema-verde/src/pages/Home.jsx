@@ -8,20 +8,26 @@ export default function Home() {
   const next = events.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   return (
     <>
-      <h2>Em destaque</h2>
-      <div className="grid">{attractions.slice(0, 3).map((a) => <AttractionCard key={a.id} a={a} />)}</div>
+      <section className="panel">
+        <h2>Em destaque</h2>
+        <div className="grid">{attractions.slice(0, 3).map((a) => <AttractionCard key={a.id} a={a} />)}</div>
+      </section>
 
-      <h2>Novidades</h2>
-      <div className="grid">
-        {news.map((n) => <article className="card" key={n.id}><h3>{n.title}</h3><p>{n.text}</p></article>)}
-      </div>
+      <section className="panel">
+        <h2>Novidades</h2>
+        <div className="grid">
+          {news.map((n) => <article className="card" key={n.id}><h3>{n.title}</h3><p>{n.text}</p></article>)}
+        </div>
+      </section>
 
-      <h2>Próximos eventos</h2>
-      <ul className="list">
-        {next.map((e) => <li key={e.id}><span><strong>{fmt(e.date)}</strong> · {e.time} · {e.title}</span> <Badge s={e.status} /></li>)}
-        {!next.length && <li>Nenhum evento futuro cadastrado.</li>}
-      </ul>
-      <Link to="/eventos" className="btn">Ver todos os eventos →</Link>
+      <section className="panel">
+        <h2>Próximos eventos</h2>
+        <ul className="list">
+          {next.map((e) => <li key={e.id}><span><strong>{fmt(e.date)}</strong> · {e.time} · {e.title}</span> <Badge s={e.status} /></li>)}
+          {!next.length && <li>Nenhum evento futuro cadastrado.</li>}
+        </ul>
+        <Link to="/eventos" className="btn">Ver todos os eventos →</Link>
+      </section>
     </>
   );
 }

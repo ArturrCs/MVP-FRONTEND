@@ -18,7 +18,6 @@ export default function Login({ onLogin }) {
       <label>Senha<input name="pass" type="password" required autoComplete="current-password" /></label>
       {err && <p role="alert" className="err">{err}</p>}
       <button className="btn">Entrar</button>
-      <p className="hint">Demo: admin@saquaremaverde.com / verde123</p>
     </form>
   );
 }

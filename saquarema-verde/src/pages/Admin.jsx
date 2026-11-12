@@ -14,18 +14,18 @@ function SaveBar({ show, onSave, onCancel }) {
   );
 }
 
-function Crud({ title, k, list, fields, defaults = {}, noList }) {
+function Crud({ id, title, k, list, fields, defaults = {}, noList }) {
   const empty = Object.fromEntries(fields.map((x) => [x.k, x.opts ? x.opts[0] : ""]));
   const [f, setF] = useState(empty);
   const [editId, setEditId] = useState(null);
   const [msg, setMsg] = useState("");
   const orig = list.find((i) => i.id === editId);
-  const dirty = !!orig && fields.some((x) => orig[x.k] !== f[x.k]);
+  const dirty = !!orig && fields.some((x) => (orig[x.k] ?? "") !== f[x.k]);
   const reset = () => { setF(empty); setEditId(null); };
 
   const submit = (e) => {
     e?.preventDefault();
-    if (fields.some((x) => !String(f[x.k]).trim())) return setMsg("Preencha todos os campos.");
+    if (fields.some((x) => !x.opt && !String(f[x.k]).trim())) return setMsg("Preencha todos os campos.");
     if (editId) {
       update((d) => ({ ...d, [k]: d[k].map((i) => (i.id === editId ? { ...i, ...f } : i)) }));
       setMsg("Alteração salva!");
@@ -35,11 +35,11 @@ function Crud({ title, k, list, fields, defaults = {}, noList }) {
     }
     reset();
   };
-  const edit = (i) => { setEditId(i.id); setF(Object.fromEntries(fields.map((x) => [x.k, i[x.k]]))); setMsg(""); };
+  const edit = (i) => { setEditId(i.id); setF(Object.fromEntries(fields.map((x) => [x.k, i[x.k] ?? ""]))); setMsg(""); };
   const del = (id) => { update((d) => ({ ...d, [k]: d[k].filter((i) => i.id !== id) })); if (id === editId) reset(); };
 
   return (
-    <section className="card">
+    <section className="card" id={id}>
       <h2>{title}</h2>
       <form onSubmit={submit} className="form">
         {fields.map((x) => (
@@ -63,7 +63,7 @@ function Crud({ title, k, list, fields, defaults = {}, noList }) {
         <ul className="list">
           {list.map((i) => (
             <li key={i.id}>
-              <span>{fields.map((x) => i[x.k]).join(" · ")}</span>
+              <span>{fields.map((x) => i[x.k]).filter(Boolean).join(" · ")}</span>
               <span className="actions">
                 <button className="link ed" onClick={() => edit(i)}>Editar</button>
                 <button className="link" onClick={() => del(i.id)}>Remover</button>
@@ -77,18 +77,34 @@ function Crud({ title, k, list, fields, defaults = {}, noList }) {
   );
 }
 
-function AlertBox({ alert }) {
-  const [al, setAl] = useState(alert);
-  const [m, setM] = useState("");
-  const dirty = al.text !== alert.text || al.active !== alert.active;
-  const save = () => { update((d) => ({ ...d, alert: al })); setM("Aviso salvo!"); };
+function Avisos({ alerts }) {
+  const [t, setT] = useState("");
+  const set = (id, p) => update((d) => ({ ...d, alerts: d.alerts.map((x) => (x.id === id ? { ...x, ...p } : x)) }));
+  const add = (e) => {
+    e.preventDefault();
+    if (!t.trim()) return;
+    update((d) => ({ ...d, alerts: [...d.alerts, { id: uid(), active: true, text: t.trim() }] }));
+    setT("");
+  };
   return (
-    <section className="card">
-      <h2>Faixa de aviso no topo do site</h2>
-      <label>Texto do aviso<input value={al.text} onChange={(e) => setAl({ ...al, text: e.target.value })} /></label>
-      <label className="chk"><input type="checkbox" checked={al.active} onChange={(e) => setAl({ ...al, active: e.target.checked })} /> Exibir no topo do site</label>
-      {m && !dirty && <p role="status" className="okmsg">{m}</p>}
-      <SaveBar show={dirty} onSave={save} onCancel={() => setAl(alert)} />
+    <section className="card" id="avisos">
+      <h2>Avisos da página principal</h2>
+      <p className="hint">Com 2 ou mais avisos ativos, eles se alternam automaticamente.</p>
+      <form onSubmit={add} className="form">
+        <label>Novo aviso<input value={t} onChange={(e) => setT(e.target.value)} /></label>
+        <div className="actions"><button className="btn">Adicionar aviso</button></div>
+      </form>
+      <ul className="list">
+        {alerts.map((x) => (
+          <li key={x.id}>
+            <span>{x.text}</span>
+            <span className="actions">
+              <label className="chk"><input type="checkbox" checked={x.active} onChange={(e) => set(x.id, { active: e.target.checked })} /> Exibir</label>
+              <button className="link" onClick={() => update((d) => ({ ...d, alerts: d.alerts.filter((y) => y.id !== x.id) }))}>Remover</button>
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -97,7 +113,7 @@ function Reports({ reports }) {
   const set = (id, p) => update((d) => ({ ...d, reports: d.reports.map((r) => (r.id === id ? { ...r, ...p } : r)) }));
   const del = (id) => update((d) => ({ ...d, reports: d.reports.filter((r) => r.id !== id) }));
   return (
-    <section className="card">
+    <section className="card" id="relatos">
       <h2>Relatos de visitantes</h2>
       {!reports.length && <p>Nenhum relato recebido.</p>}
       <ul className="list">
@@ -115,10 +131,12 @@ function Reports({ reports }) {
   );
 }
 
-const TEXT = [["hours", "Horário"], ["condition", "Condição"], ["image", "Capa (/img/arquivo.jpg ou URL)"], ["location", "Local no mapa (endereço ou lat,lng)"]];
+const TEXT = [["hours", "Horário"], ["condition", "Condição"], ["address", "Endereço (aparece no perfil e no mapa)"], ["image", "Capa (/img/arquivo.jpg ou URL)"], ["location", "Local no mapa (endereço ou lat,lng)"]];
+
+const TOPICS = [["avisos", "Avisos"], ["atracoes", "Atrações"], ["nova", "Nova atração"], ["relatos", "Relatos"], ["eventos", "Eventos"], ["temporadas", "Temporadas"], ["novidades", "Novidades"]];
 
 export default function Admin() {
-  const { attractions, events, seasons, news, alert, reports = [] } = useData();
+  const { attractions, events, seasons, news, alerts = [], reports = [] } = useData();
   const [ed, setEd] = useState({});
   const [msg, setMsg] = useState("");
   const draft = attractions.map((a) => ({ ...a, ...ed[a.id] }));
@@ -149,17 +167,26 @@ export default function Admin() {
     ["Atrações abertas", `${attractions.filter((a) => a.status === "Aberta").length}/${attractions.length}`],
     ["Eventos futuros", events.filter((e) => e.date >= today).length],
     ["Relatos novos", reports.filter((r) => r.status === "Novo").length],
-    ["Aviso no ar", alert?.active && alert.text ? "Sim" : "Não"],
+    ["Avisos no ar", alerts.filter((x) => x.active && x.text).length],
   ];
 
   return (
     <>
-      <h1>Painel do administrador</h1>
-      <div className="stats">{stats.map(([k, v]) => <div key={k}><strong>{v}</strong><span>{k}</span></div>)}</div>
+      <section className="panel">
+        <div className="stats">
+          <div className="stat-title"><h1>Painel do Administrador</h1><span>Gerencie o conteúdo do site</span></div>
+          {stats.map(([k, v]) => <div key={k}><strong>{v}</strong><span>{k}</span></div>)}
+        </div>
+      </section>
+      <nav className="quick" aria-label="Ir para um tópico">
+        {TOPICS.map(([id, l]) => (
+          <button key={id} className="btn sm" onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })}>{l}</button>
+        ))}
+      </nav>
 
-      <AlertBox alert={alert || { active: false, text: "" }} />
+      <Avisos alerts={alerts} />
 
-      <section className="card">
+      <section className="card" id="atracoes">
         <h2>Atrações</h2>
         {draft.map((a) => (
           <div className="row" key={a.id}>
@@ -200,26 +227,26 @@ export default function Admin() {
         <SaveBar show={dirty} onSave={save} onCancel={() => setEd({})} />
       </section>
 
-      <Crud title="Nova atração" k="attractions" list={[]} noList
+      <Crud id="nova" title="Nova atração" k="attractions" list={[]} noList
         defaults={{ status: "Aberta", condition: "A informar", image: "/img/parque.svg", gallery: [] }}
         fields={[
-          { k: "name", l: "Nome" }, { k: "area", l: "Área", opts: ["PECS", "REE Jacarepiá"] },
-          { k: "type", l: "Tipo", opts: ["Trilha", "Cachoeira", "Biodiversidade", "Parque"] },
+          { k: "name", l: "Nome" }, { k: "area", l: "Área", opts: ["PECS", "REE Jacarepiá", "Saquarema"] },
+          { k: "type", l: "Tipo", opts: ["Trilha", "Cachoeira", "Biodiversidade", "Parque", "Mirante", "Praia"] },
           { k: "difficulty", l: "Dificuldade", opts: ["Fácil", "Moderada", "Difícil", "Variada"] },
-          { k: "distance", l: "Distância" }, { k: "hours", l: "Horário" }, { k: "location", l: "Local no mapa" },
+          { k: "distance", l: "Distância" }, { k: "hours", l: "Horário" }, { k: "location", l: "Local no mapa" }, { k: "address", l: "Endereço", opt: true },
           { k: "desc", l: "Descrição" }, { k: "tips", l: "Dicas de segurança" }, { k: "rules", l: "Regras" },
         ]} />
 
       <Reports reports={reports} />
 
-      <Crud title="Eventos" k="events" list={events} fields={[
+      <Crud id="eventos" title="Eventos" k="events" list={events} fields={[
         { k: "title", l: "Título" }, { k: "date", l: "Data", t: "date" }, { k: "time", l: "Horário" },
-        { k: "place", l: "Local" }, { k: "status", l: "Status", opts: ["Aberto", "Lotado", "Cancelado"] },
+        { k: "place", l: "Local" }, { k: "address", l: "Endereço do local (opcional)", opt: true }, { k: "status", l: "Status", opts: ["Aberto", "Lotado", "Cancelado"] },
       ]} />
-      <Crud title="Temporadas" k="seasons" list={seasons} fields={[
+      <Crud id="temporadas" title="Temporadas" k="seasons" list={seasons} fields={[
         { k: "name", l: "Nome" }, { k: "from", l: "Início", t: "date" }, { k: "to", l: "Fim", t: "date" }, { k: "hours", l: "Horário" },
       ]} />
-      <Crud title="Novidades" k="news" list={news} fields={[{ k: "title", l: "Título" }, { k: "text", l: "Texto" }]} />
+      <Crud id="novidades" title="Novidades" k="news" list={news} fields={[{ k: "title", l: "Título" }, { k: "text", l: "Texto" }]} />
     </>
   );
 }

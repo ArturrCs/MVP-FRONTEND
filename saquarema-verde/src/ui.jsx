@@ -3,13 +3,13 @@ import { Link } from "react-router-dom";
 import { toggleFav, useFavs } from "./store";
 
 const tone = { Aberta: "ok", Aberto: "ok", Fechada: "bad", Cancelado: "bad", Lotado: "bad" };
-export const Badge = ({ s }) => <span className={"badge " + (tone[s] || "warn")}>{s}</span>;
+export const Badge = ({ s }) => <span className={"badge " + (tone[s] || "warn")}>{tone[s] ? "" : "⚠ "}{s}</span>;
 export const fmt = (d) => new Date(d + "T00:00").toLocaleDateString("pt-BR");
 
 export const mapUrl = (a, embed) =>
   embed
-    ? `https://www.google.com/maps?q=${encodeURIComponent(a.location)}&output=embed`
-    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.location)}`;
+    ? `https://www.google.com/maps?q=${encodeURIComponent(a.address || a.location)}&output=embed`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.address || a.location)}`;
 
 export const Img = (p) => (
   <img {...p} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "/img/parque.svg"; }} />
@@ -104,4 +104,7 @@ export function AttractionCard({ a }) {
 }
 
 export const defImg = (a) =>
-  ({ Trilha: "/img/trilha.svg", Cachoeira: "/img/cachoeira.svg", Biodiversidade: "/img/biodiversidade.svg" }[a.type] || "/img/parque.svg");
+  ({ Trilha: "/img/trilha.svg", Cachoeira: "/img/cachoeira.svg", Biodiversidade: "/img/biodiversidade.svg", Mirante: "/img/trilha.svg" }[a.type] || "/img/parque.svg");
+
+export const eventMapUrl = (e) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.address || `${e.place}, Saquarema, RJ`)}`;
