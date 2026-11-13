@@ -20,8 +20,8 @@ Divulgar e organizar a visitação ao Parque Estadual da Costa do Sol (PECS) e �
 | **Vite 5** | Servidor de desenvolvimento e build rápido |
 | **React Router 6** | Navegação entre as páginas, com carregamento sob demanda (lazy) das telas de login e painel |
 | **CSS próprio** | Layout responsivo (celular e computador), efeito de vidro (blur), modo de alto contraste e ajuste do tamanho da fonte |
-| **Supabase** (Postgres, Auth e Storage) | Backend: banco de dados, login de administrador, regras de acesso e fotos. Veja `supabase/README.md` |
-| **PostgreSQL / SQL** | Linguagem do backend: tabelas, regras de acesso, validações e gatilhos (pasta `supabase/`) |
+| **Supabase** (Postgres, Auth e Storage) | Backend: banco de dados, login de administrador, regras de acesso e fotos. Veja `saquarema-verde/supabase/README.md` |
+| **PostgreSQL / SQL** | Linguagem do backend: tabelas, regras de acesso, validações e gatilhos (pasta `saquarema-verde/supabase/`) |
 | **Open-Meteo** | Previsão do tempo em cada atração (API gratuita) |
 | **Google Fonts e Google Maps** | Fonte do site e links "Abrir no Google Maps" |
 | **WhatsApp (link de compartilhamento)** | Botão para compartilhar uma atração |
@@ -47,11 +47,11 @@ Para gerar a versão final: `npm run build` (a pasta `dist` é a que vai para a 
 
 ### Ativar o backend (banco de dados e login de administrador)
 
-Siga o passo a passo de `supabase/README.md`: criar o projeto no Supabase, rodar `supabase/schema.sql` e depois `supabase/melhorias-v2.2.sql`, criar o usuário administrador e copiar `.env.example` para `.env` com a URL do projeto e a chave `anon public`.
+Siga o passo a passo de `saquarema-verde/supabase/README.md`: criar o projeto no Supabase, rodar `saquarema-verde/supabase/schema.sql` e depois `saquarema-verde/supabase/melhorias-v2.2.sql`, criar o usuário administrador e copiar `saquarema-verde/.env.example` para `saquarema-verde/.env` com a URL do projeto e a chave `anon public`.
 
 ## Backend
 
-O backend usa o Supabase (banco PostgreSQL, autenticação e armazenamento de fotos). Toda a estrutura está em arquivos SQL na pasta `supabase/`:
+O backend usa o Supabase (banco PostgreSQL, autenticação e armazenamento de fotos). Toda a estrutura está em arquivos SQL na pasta `saquarema-verde/supabase/`:
 
 | Arquivo | O que faz |
 |---|---|
@@ -68,12 +68,12 @@ O backend usa o Supabase (banco PostgreSQL, autenticação e armazenamento de fo
 
 ## Informações adicionais
 
-- **Segurança:** o painel só aceita contas com papel `admin`. As regras do banco (Row Level Security) impedem que visitantes alterem conteúdo ou leiam relatos. Cadastro público de usuários deve ficar desligado. A chave `service_role` nunca deve ser usada no site, e o arquivo `.env` não vai para o GitHub.
+- **Segurança:** o painel só aceita contas com papel `admin`. As regras do banco (Row Level Security) impedem que visitantes alterem conteúdo ou leiam relatos. Cadastro público de usuários deve ficar desligado. A chave `service_role` nunca deve ser usada no site, e o arquivo `saquarema-verde/.env` não vai para o GitHub.
 - **Acessibilidade:** botão no canto inferior direito para alto contraste e tamanho da fonte.
 - **Desempenho:** fotos reduzidas antes do envio, páginas administrativas carregadas só quando necessárias, cabeçalho que se oculta ao rolar no celular.
 - **Dados das atrações:** foram pesquisados em fontes públicas (decreto de criação do PECS, INEA e guias de turismo), com as fontes listadas no perfil de cada atração. Horários, distâncias e regras marcados como "A confirmar" ou "Consulte a administração" devem ser validados com o INEA e a Prefeitura.
 - **Fotos:** as capas das atrações são enviadas pelo painel e ficam no Storage do Supabase. Atrações sem foto mostram uma ilustração padrão. Em uma publicação aberta ao público, use apenas fotos com direito de uso.
-- **Dados de exemplo:** as atrações são reais. Os eventos, temporadas, novidades e o aviso exibidos vêm de `supabase/demo-data.sql` e são fictícios, mantidos apenas para demonstrar as funcionalidades. Devem ser apagados antes de uma publicação aberta ao público.
+- **Dados de exemplo:** as atrações são reais. Os eventos, temporadas, novidades e o aviso exibidos vêm de `saquarema-verde/supabase/demo-data.sql` e são fictícios, mantidos apenas para demonstrar as funcionalidades. Devem ser apagados antes de uma publicação aberta ao público.
 - **Favoritos e inscrição em eventos:** ficam guardados apenas no navegador do visitante.
 
 ## MVP definido
