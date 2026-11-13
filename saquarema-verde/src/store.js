@@ -139,14 +139,29 @@ const asubs = new Set();
 const setAuth = (a) => { auth = a; asubs.forEach((f) => f()); };
 export const useAuth = () => useSyncExternalStore((f) => { asubs.add(f); return () => asubs.delete(f); }, () => auth);
 
+// Relatos novos chegam de outros navegadores: com o admin logado, busca de novo a cada 15 s
+// (e ao voltar para a aba), para o contador do Painel atualizar sem precisar recarregar.
+let reportsTimer = null;
+const refreshReports = async () => {
+  if (!auth.admin || document.hidden) return;
+  try {
+    const rows = await fetchTable("reports");
+    if (auth.admin && JSON.stringify(rows) !== JSON.stringify(data.reports)) set({ reports: rows });
+  } catch (e) { console.error(e); }
+};
+
 if (!demoMode) {
   supabase.auth.onAuthStateChange((_ev, session) => {
     const admin = isAdminUser(session?.user);
     const was = auth.admin;
     setAuth({ ready: true, admin, email: admin ? session.user.email : "" });
-    if (admin && !was) setTimeout(async () => { try { set({ reports: await fetchTable("reports") }); } catch (e) { console.error(e); } }, 0);
-    if (!admin && was) set({ reports: [] });
+    if (admin && !was) {
+      setTimeout(refreshReports, 0);
+      reportsTimer = setInterval(refreshReports, 15000);
+    }
+    if (!admin && was) { clearInterval(reportsTimer); set({ reports: [] }); }
   });
+  document.addEventListener("visibilitychange", refreshReports);
   reload();
 }
 

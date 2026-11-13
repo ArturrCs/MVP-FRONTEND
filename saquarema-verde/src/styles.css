@@ -302,7 +302,8 @@ section.card[id]{scroll-margin-top:9rem}
 @media(max-width:800px){
   .top{transition:transform .3s ease}
   [data-top=hide] .top{transform:translateY(-100%)}
-  [data-top=hide] .top:focus-within{transform:none}
+  /* só mantém o topo visível para quem navega pelo teclado (um toque no menu não conta) */
+  [data-top=hide] .top:has(:focus-visible){transform:none}
   .quick{transition:top .3s ease}
   [data-top=hide] .quick{top:.5rem}
 }
