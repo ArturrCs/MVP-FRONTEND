@@ -311,3 +311,15 @@ section.card[id]{scroll-margin-top:9rem}
 /* ---- backend: avisos de estado ---- */
 .demo-note{background:#fff4d6;color:#5a4300;border:1px solid #e0c36a;border-radius:10px;padding:8px 12px;font-size:.9rem;margin:0 0 12px}
 button:disabled{opacity:.6;cursor:wait}
+
+/* ---- Celular: topo organizado (logo + entrar/sair na 1ª linha, menu em grade de 2 colunas) ---- */
+@media(max-width:800px){
+  .top .bar{display:grid;grid-template-columns:repeat(6,1fr);gap:.45rem;align-items:center;padding:.6rem .8rem}
+  .top .bar nav{display:contents}
+  .top .logo{grid-column:1/5;grid-row:1;min-width:0;font-size:1.05rem;gap:.45rem}
+  .top .logo svg{width:2rem;flex:none}
+  .bar nav .btn{grid-column:5/7;grid-row:1;justify-self:end;padding:.4rem 1rem;font-size:.9rem}
+  .bar nav a:not(.btn){grid-column:span 3;text-align:center;padding:.5rem .3rem;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bar nav a:not(.btn):nth-of-type(5){grid-column:1/-1}
+  .bar nav a:not(.btn):hover{transform:none}
+}
