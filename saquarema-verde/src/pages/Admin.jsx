@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useData, add, patch, remove, uploadImage } from "../store";
+import { useEffect, useState } from "react";
+import { useData, add, patch, remove, uploadImage, fetchAudit, demoMode } from "../store";
 import { defImg } from "../ui";
 
 // Botão flutuante central: aparece só quando há alteração não salva
@@ -140,9 +140,55 @@ function Reports({ reports }) {
   );
 }
 
+// Histórico de alterações: gravado pelo próprio banco (gatilhos em supabase/melhorias-v2.2.sql)
+const ACAO = { INSERT: "Criou", UPDATE: "Alterou", DELETE: "Apagou" };
+const TABELA = { attractions: "atração", events: "evento", seasons: "temporada", news: "novidade", alerts: "aviso", reports: "relato" };
+const CAMPO = {
+  name: "nome", title: "título", message: "texto", body: "texto", status: "status", difficulty: "dificuldade", type: "tipo", area: "área",
+  distance: "distância", hours: "horário", trail_condition: "condição", description: "descrição", tips: "dicas", rules: "regras",
+  image: "capa", gallery: "galeria", location: "local no mapa", address: "endereço", event_date: "data", event_time: "horário",
+  place: "local", date_from: "início", date_to: "fim", active: "exibição", sources: "fontes",
+};
+
+function Historico() {
+  const [rows, setRows] = useState([]);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async () => {
+    setBusy(true); setErr("");
+    try { setRows(await fetchAudit()); } catch (x) { setErr(x.message); }
+    finally { setBusy(false); }
+  };
+  useEffect(() => { if (!demoMode) load(); }, []);
+  return (
+    <section className="card" id="historico">
+      <h2>Histórico de alterações</h2>
+      <p className="hint">Registro automático feito pelo banco de dados: quem criou, alterou ou apagou cada item. Mostra as 50 ações mais recentes.</p>
+      <div className="actions"><button type="button" className="btn sm" onClick={load} disabled={busy || demoMode}>{busy ? "Carregando…" : "Atualizar"}</button></div>
+      {demoMode && <p>Disponível apenas com o Supabase conectado.</p>}
+      {err && <p role="alert" className="err">{err}</p>}
+      {!demoMode && !err && !busy && !rows.length && <p>Nenhuma alteração registrada ainda.</p>}
+      <ul className="list">
+        {rows.map((r) => {
+          const campos = r.action === "UPDATE" && r.changes ? Object.keys(r.changes).map((k) => CAMPO[k] || k).join(", ") : "";
+          return (
+            <li key={r.id}>
+              <span>
+                <strong>{ACAO[r.action] || r.action} {TABELA[r.table_name] || r.table_name}</strong>{r.label && <> · {r.label}</>}
+                {campos && <><br />Campos alterados: {campos}</>}
+                <br />{new Date(r.changed_at).toLocaleString("pt-BR")} · {r.user_email}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 const TEXT = [["hours", "Horário"], ["condition", "Condição"], ["address", "Endereço (aparece no perfil e no mapa)"], ["image", "Capa (/img/arquivo.jpg ou URL)"], ["location", "Local no mapa (endereço ou lat,lng)"]];
 
-const TOPICS = [["avisos", "Avisos"], ["atracoes", "Atrações"], ["nova", "Nova atração"], ["relatos", "Relatos"], ["eventos", "Eventos"], ["temporadas", "Temporadas"], ["novidades", "Novidades"]];
+const TOPICS = [["avisos", "Avisos"], ["atracoes", "Atrações"], ["nova", "Nova atração"], ["relatos", "Relatos"], ["eventos", "Eventos"], ["temporadas", "Temporadas"], ["novidades", "Novidades"], ["historico", "Histórico"]];
 
 export default function Admin() {
   const { attractions, events, seasons, news, alerts = [], reports = [] } = useData();
@@ -268,6 +314,8 @@ export default function Admin() {
         { k: "name", l: "Nome" }, { k: "from", l: "Início", t: "date" }, { k: "to", l: "Fim", t: "date" }, { k: "hours", l: "Horário" },
       ]} />
       <Crud id="novidades" title="Novidades" k="news" list={news} fields={[{ k: "title", l: "Título" }, { k: "text", l: "Texto" }]} />
+
+      <Historico />
     </>
   );
 }

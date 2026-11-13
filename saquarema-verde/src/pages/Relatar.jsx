@@ -18,7 +18,10 @@ export default function Relatar() {
       form.reset();
       setOk(true);
     } catch (x) {
-      setErr(demoMode ? "Modo demonstração: o relato não foi enviado de verdade." : "Não foi possível enviar agora. Tente novamente.");
+      const m = x?.message || "";
+      setErr(demoMode ? "Modo demonstração: o relato não foi enviado de verdade."
+        : /^(Muitos relatos|Este relato já)/.test(m) ? m
+        : "Não foi possível enviar agora. Tente novamente.");
     } finally { setBusy(false); }
   };
   return (

@@ -4,11 +4,7 @@ Site de turismo verde de Saquarema (RJ), com informações sobre parques, trilha
 
 ## Integrantes
 
-- Nome do integrante 1
-- Nome do integrante 2
-- Nome do integrante 3
-
-> Substitua pelos nomes reais da equipe.
+   Artur Camelo da Silva
 
 ## Situação-Problema escolhida
 

@@ -3,6 +3,7 @@
 1. Crie uma conta grátis em https://supabase.com e clique em **New project** (guarde a senha do banco).
 2. Menu **SQL Editor → New query**, cole todo o conteúdo de `supabase/schema.sql` e clique **Run**.
    Isso cria as tabelas, as regras de segurança (RLS), o bucket de fotos `fotos` e as 12 atrações reais.
+   Em seguida rode também `supabase/melhorias-v2.2.sql` (validações, histórico de alterações e proteção contra spam nos relatos).
 3. (Opcional) Rode `supabase/demo-data.sql` para ter eventos/novidades de exemplo (dados inventados — apague antes de publicar).
 4. Crie o administrador: **Authentication → Users → Add user → Create new user**, com e-mail e senha forte, marcando *Auto Confirm User*.
 5. Dê o papel de admin a esse usuário (SQL Editor, trocando o e-mail):

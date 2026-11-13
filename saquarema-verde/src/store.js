@@ -65,17 +65,47 @@ export const reload = async () => {
 
 // ---------- Escrita (somente administrador; o banco confere de novo via RLS) ----------
 const guard = () => { if (demoMode) throw new Error("Modo demonstração: conecte o Supabase para salvar alterações."); };
-const msg = (e) => (e?.message?.includes("row-level security") ? "Sem permissão para esta ação." : e?.message || "Erro ao salvar.");
+// Mensagens amigáveis para as validações do banco (supabase/melhorias-v2.2.sql)
+const RULES = {
+  seasons_datas_ok: "A data de fim não pode ser antes da data de início.",
+  attractions_status_ok: "Status de atração inválido.",
+  attractions_dificuldade_ok: "Dificuldade inválida.",
+  attractions_tipo_ok: "Tipo de atração inválido.",
+  events_status_ok: "Status de evento inválido.",
+  reports_status_ok: "Status de relato inválido.",
+  news_texto_ok: "O texto da novidade passou do limite de 5000 caracteres.",
+  alerts_mensagem_ok: "O aviso deve ter entre 1 e 300 caracteres.",
+  _nome_ok: "O nome deve ter entre 1 e 200 caracteres.",
+  _titulo_ok: "O título deve ter entre 1 e 200 caracteres.",
+};
+const msg = (e) => {
+  const m = e?.message || "";
+  if (m.includes("row-level security")) return "Sem permissão para esta ação.";
+  const rule = Object.keys(RULES).find((k) => m.includes(k));
+  return rule ? RULES[rule] : m || "Erro ao salvar.";
+};
 
 export async function add(t, obj) {
   guard();
+  // Visitante enviando relato: não pode ler a tabela, então grava sem pedir a linha de volta.
+  if (t === "reports" && !auth.admin) {
+    const { error } = await supabase.from(t).insert(toDb(t, obj));
+    if (error) throw new Error(msg(error));
+    return null;
+  }
   const { data: row, error } = await supabase.from(t).insert(toDb(t, obj)).select().single();
   if (error) throw new Error(msg(error));
-  if (t !== "reports" || auth.admin) {
-    const item = toApp(t, row);
-    set({ [t]: ORDER[t][1] ? [...data[t], item] : [item, ...data[t]] });
-  }
+  const item = toApp(t, row);
+  set({ [t]: ORDER[t][1] ? [...data[t], item] : [item, ...data[t]] });
   return row.id;
+}
+
+// Histórico de alterações (somente administrador): últimas 50 ações registradas pelo banco.
+export async function fetchAudit() {
+  guard();
+  const { data: rows, error } = await supabase.from("audit_log").select("*").order("id", { ascending: false }).limit(50);
+  if (error) throw new Error(error.code === "42P01" || error.code === "PGRST205" ? "Histórico ainda não instalado: rode supabase/melhorias-v2.2.sql no Supabase." : msg(error));
+  return rows;
 }
 
 export async function patch(t, id, obj) {
